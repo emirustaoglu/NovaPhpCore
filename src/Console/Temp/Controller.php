@@ -1,0 +1,6 @@
+%NameSpace%
+
+%UseArea%
+
+%ClassArea%
+

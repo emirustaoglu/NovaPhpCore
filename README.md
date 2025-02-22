@@ -1,0 +1,2 @@
+# NovaPhpCore
+ NovaPhp Framework Core

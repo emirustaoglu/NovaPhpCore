@@ -1,0 +1,29 @@
+{
+  "name": "novaphp/core",
+  "description": "NovaPHP Framework Core Library",
+  "version": "1.0.0",
+  "type": "library",
+  "license": "MIT",
+  "autoload": {
+    "psr-4": {
+      "NovaCore\\": "src/"
+    }
+  },
+  "authors": [
+    {
+      "name": "Yusuf Emir USTAOĞLU",
+      "email": "emiru893@gmail.com"
+    }
+  ],
+  "require": {
+    "php": ">=8.3",
+    "ext-pdo": "*",
+    "izniburak/router": "^3.0",
+    "jenssegers/blade": "^2.0",
+    "illuminate/view": "11.7.0",
+    "vlucas/valitron": "^1.4",
+    "filp/whoops": "^2.15",
+    "arrilot/dotenv-php": "^2.0",
+    "phpmailer/phpmailer": "^6.8"
+  }
+}
