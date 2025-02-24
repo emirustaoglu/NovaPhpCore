@@ -49,6 +49,8 @@ class CLI
             $this->listCommands();
         } elseif (strpos($command, 'make:') === 0) {
             $this->handleMakeCommand($command);
+        } elseif(strpos($command, 'route:') === 0){
+            $this->handleRouteCommand($command);
         } else {
             $this->handleCommand($command);
         }
@@ -93,6 +95,30 @@ class CLI
             $this->executeCommand($commandClass);
         } else {
             echo "Geçersiz komut: $command\n";
+        }
+    }
+
+    private function handleRouteCommand(string $command): void
+    {
+        // 'route:' komutlarını ayır
+        $parts = explode(':', $command);
+
+        if (count($parts) < 2) {
+            echo "Geçersiz komut formatı. Geçerli komut listesi php nova list komutunu kullanınız.";
+            exit(1);
+        }
+
+        $action = $parts[1]; // 'migration', 'seed', 'view' gibi
+        $className = ucfirst($action); // Migration -> MigrationCommand
+
+        // Komut sınıfını kontrol et
+        $commandClass = "NovaCore\\Console\\Commands\\Route\\$className";
+
+        if (class_exists($commandClass)) {
+            $this->executeCommand($commandClass);
+        } else {
+            echo "Geçersiz 'route' komutu: $command\n";
+            exit(1);
         }
     }
 
