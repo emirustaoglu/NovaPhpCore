@@ -356,6 +356,6 @@ Bu proje MIT lisansı altında lisanslanmıştır. Detaylar için [LICENSE](LICE
 
 ## İletişim
 
-Yusuf Emir USTAOĞLU - [@emirustaoglu](https://twitter.com/emirustaoglu) - emiru893@gmail.com
+Yusuf Emir USTAOĞLU - [@emiru893](https://twitter.com/emiru893) - emiru893@gmail.com
 
 Proje Linki: [https://github.com/emirustaoglu/NovaPhpCore](https://github.com/emirustaoglu/NovaPhpCore)
