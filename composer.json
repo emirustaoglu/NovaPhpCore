@@ -18,9 +18,13 @@
       "email": "emiru893@gmail.com"
     }
   ],
+  "minimum-stability": "stable",
   "require": {
     "php": ">=8.3",
     "ext-pdo": "*",
+    "ext-mbstring": "*",
+    "ext-json": "*",
+    "ext-openssl": "*",
     "izniburak/router": "^3.0",
     "jenssegers/blade": "^2.0",
     "illuminate/view": "11.7.0",
