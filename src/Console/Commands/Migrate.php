@@ -2,23 +2,42 @@
 
 namespace NovaCore\Console\Commands;
 
-use NovaCore\Database\MigrationManager;
+use NovaCore\Console\Command;
+use NovaCore\Database\DatabaseServiceProvider;
 
-class Migrate
+class Migrate extends Command
 {
+    protected string $signature = 'migrate {--fresh} {--seed} {--step=}';
+    protected string $description = 'Veritabanı migrationlarını çalıştırır';
+
     public function handle(): void
     {
-        global $argv;
-        $manager = new MigrationManager(BasePath . "database/migrations", array());
-        if ($argv[2] == "up") {
-            $manager->migrateUp();
-        } else {
-            $manager->migrateDown();
-        }
-    }
+        $fresh = $this->option('fresh');
+        $seed = $this->option('seed');
+        $step = $this->option('step');
 
-    public static function getDescription(): string
-    {
-        return "Veritabanı eşitlemesini yapar.";
+        $provider = new DatabaseServiceProvider();
+        $services = $provider->register();
+        $migrationManager = $services['migrationManager'];
+
+        if ($fresh) {
+            $this->info('Veritabanı sıfırlanıyor...');
+            $migrationManager->reset();
+        }
+
+        $this->info('Migrationlar çalıştırılıyor...');
+        
+        if ($step) {
+            $migrationManager->migrate((int)$step);
+        } else {
+            $migrationManager->migrate();
+        }
+
+        if ($seed) {
+            $this->info('Seeder\'lar çalıştırılıyor...');
+            $services['seedManager']->run();
+        }
+
+        $this->info('İşlem tamamlandı!');
     }
 }

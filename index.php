@@ -2,9 +2,26 @@
 
 require_once __DIR__ . '/vendor/autoload.php';
 
-define('BasePath', __DIR__ ."/");
+use NovaCore\Router\Router;
 
-use NovaCore\Console\CLI;
-$a = new CLI();
+$router = new Router(array(
+    'base_folder' => '',
+    'main_method' => '',
+    'paths' => [
+        'controllers' =>  '',
+        'middlewares' =>  '',
+    ],
+    'namespaces' => [
+        'controllers' =>  '',
+        'middlewares' => '',
+    ],
+    'debug' => true
+));
 
-$a->run();
+$router->get('', function (){
+   echo "Test";
+});
+
+$router->run();
+
+echo $router->getRoutes();

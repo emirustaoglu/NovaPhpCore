@@ -2,18 +2,23 @@
 
 namespace NovaCore\Console\Commands\Make;
 
-class Model
+use NovaCore\Console\Command;
+
+class Model extends Command
 {
+    protected string $signature = 'make:model {modelName}';
+    protected string $description = 'Yeni bir model dosyası oluşturur.';
+
     public function handle(): void
     {
-        global $argv;
-        $modelName = $argv[2];
+        $modelName = $this->argument('modelName');
         if (!$modelName) {
-            die("Bir model adı belirtmelisiniz. Örnek: php nova make:model modelName\n");
+            $this->error("Bir model adı belirtmelisiniz. Örnek: php nova make:model modelName");
+            return;
         }
 
         // Template dosyasının yolu
-        $templatePath = __DIR__ . '/../../Temp/' . 'Model.php';
+        $templatePath = __DIR__ . '/../../Templates/' . 'Model.php';
 
         // ModelName'deki son bölümü sınıf adı olarak al
         $modelNameParts = explode('/', $modelName);
@@ -29,7 +34,8 @@ class Model
         }
 
         if (!file_exists($templatePath)) {
-            die("Template dosyası bulunamadı!\n");
+            $this->error("Template dosyası bulunamadı!");
+            return;
         }
 
         // Namespace'i oluştur (App\Model\Kullanici gibi)
@@ -61,14 +67,9 @@ namespace " . $namespace . ";", // Dinamik namespace ekle
 
         // Yeni model dosyasını oluştur ve içeriğini yaz
         if (file_put_contents($newModelPath, $templateContent) !== false) {
-            echo "Yeni model dosyası oluşturuldu: $newModelPath\n";
+            $this->info("Yeni model dosyası oluşturuldu: $newModelPath");
         } else {
-            echo "Yeni model dosyası oluşturulamadı!\n";
+            $this->error("Yeni model dosyası oluşturulamadı!");
         }
-    }
-
-    public static function getDescription(): string
-    {
-        return "Yeni bir model dosyası oluşturur. => make:model modelAdi";
     }
 }

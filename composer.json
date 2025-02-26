@@ -7,7 +7,10 @@
   "autoload": {
     "psr-4": {
       "NovaCore\\": "src/"
-    }
+    },
+    "files": [
+      "src/Support/helpers.php"
+    ]
   },
   "authors": [
     {
@@ -24,6 +27,8 @@
     "vlucas/valitron": "^1.4",
     "filp/whoops": "^2.15",
     "arrilot/dotenv-php": "^2.0",
-    "phpmailer/phpmailer": "^6.8"
+    "phpmailer/phpmailer": "^6.8",
+    "predis/predis": "^2.2",
+    "fakerphp/faker": "^1.23"
   }
 }

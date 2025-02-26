@@ -2,46 +2,57 @@
 
 namespace NovaCore\Console\Commands\Make;
 
-class Seed
+use NovaCore\Console\Command;
+
+class Seed extends Command
 {
+    protected string $signature = 'make:seed {seedName}';
+    protected string $description = 'Yeni bir seeder dosyası oluşturur.';
+
     public function handle(): void
     {
-        global $argv;
-        $seedName = isset($argv[2]) ? $argv[2] : '';
-
+        $seedName = $this->argument('seedName');
         if (!$seedName) {
-            die("Bir seed adı belirtmelisiniz. Örnek: php nova make:seed seedName\n");
+            $this->error("Bir seeder adı belirtmelisiniz. Örnek: php nova make:seed UsersTableSeeder");
+            return;
         }
 
         // Template dosyasının yolu
-        $templatePath = __DIR__ . '/../../Temp/' . 'Seeds.php';
+        $templatePath = __DIR__ . '/../../Templates/Seed.php';
 
-        // Yeni seed dosyasının oluşturulacağı yol
-        $newSeedPath = BasePath . "databases/seeds/" . date("Y-m-d-H-i-s") . "-" . $seedName . '.php';
+        // Yeni seeder dosyasının oluşturulacağı yol
+        $newSeederPath = BasePath . "database/seeds/" . $seedName . '.php';
 
         if (!file_exists($templatePath)) {
-            die("Template dosyası bulunamadı!\n");
+            $this->error("Template dosyası bulunamadı!");
+            return;
         }
 
         // Template dosyasını oku
         $templateContent = file_get_contents($templatePath);
 
-        $templateContent = str_replace('%DosyaAdi%', $seedName, str_replace('%EklenmeTarihi%', date('Y-m-d H:i:s'), $templateContent));
+        // Seeder sınıf adını oluştur
+        $className = str_replace(' ', '', ucwords(str_replace('_', ' ', $seedName)));
+        
+        // Template içeriğini düzenle
+        $templateContent = str_replace('%DosyaAdi%', $className, $templateContent);
 
-        if (!file_exists(BasePath . "databases/seeds/")) {
-            mkdir(BasePath . "databases/seeds/", 0777, true);
+        // Tablo adını otomatik belirle
+        if (preg_match('/(\w+)TableSeeder/', $className, $matches)) {
+            $tableName = strtolower($matches[1]);
+            $templateContent = str_replace('table_name', $tableName, $templateContent);
         }
-        // Yeni seed dosyasını oluştur ve içeriğini yaz
-        if (file_put_contents($newSeedPath, $templateContent) !== false) {
-            echo "Yeni seeds dosyası oluşturuldu: $newSeedPath\n";
+
+        // Dizin yoksa oluştur
+        if (!file_exists(BasePath . "database/seeds/")) {
+            mkdir(BasePath . "database/seeds/", 0777, true);
+        }
+
+        // Yeni seeder dosyasını oluştur
+        if (file_put_contents($newSeederPath, $templateContent) !== false) {
+            $this->info("Seeder dosyası oluşturuldu: $newSeederPath");
         } else {
-            echo "Yeni seeds dosyası oluşturulamadı!\n";
+            $this->error("Seeder dosyası oluşturulamadı!");
         }
-        exit;
-    }
-
-    public static function getDescription():string
-    {
-        return "Yeni bir seed dosyası oluşturur. => make:seed seedAdi";
     }
 }

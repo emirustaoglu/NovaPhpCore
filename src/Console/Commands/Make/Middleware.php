@@ -2,18 +2,23 @@
 
 namespace NovaCore\Console\Commands\Make;
 
-class Middleware
+use NovaCore\Console\Command;
+
+class Middleware extends Command
 {
+    protected string $signature = 'make:middleware {middlewareName}';
+    protected string $description = 'Yeni bir middleware dosyası oluşturur.';
+
     public function handle(): void
     {
-        global $argv;
-        $middlewareName = $argv[2];
+        $middlewareName = $this->argument('middlewareName');
         if (!$middlewareName) {
-            die("Bir middleware adı belirtmelisiniz. Örnek: php nova make:middleware middlewareName\n");
+            $this->error("Bir middleware adı belirtmelisiniz. Örnek: php nova make:middleware middlewareName");
+            return;
         }
 
         // Template dosyasının yolu
-        $templatePath = __DIR__ . '/../../Temp/' . 'Middlewares.php';
+        $templatePath = __DIR__ . '/../../Templates/' . 'Middlewares.php';
 
         // MiddlewaresName'deki son bölümü sınıf adı olarak al
         $middlewareNameParts = explode('/', $middlewareName);
@@ -29,7 +34,8 @@ class Middleware
         }
 
         if (!file_exists($templatePath)) {
-            die("Template dosyası bulunamadı!\n");
+            $this->error("Template dosyası bulunamadı!");
+            return;
         }
 
         // Namespace'i oluştur (App\Controllers\Kullanici gibi)
@@ -64,16 +70,11 @@ namespace " . $namespace . ";", // Dinamik namespace ekle
             str_replace('%EklenmeTarihi%', date('Y-m-d H:i:s'), $templateContent)
         );
 
-        // Yeni controller dosyasını oluştur ve içeriğini yaz
+        // Yeni middleware dosyasını oluştur ve içeriğini yaz
         if (file_put_contents($newMiddlewaresPath, $templateContent) !== false) {
-            echo "Yeni middlewares dosyası oluşturuldu: $newMiddlewaresPath\n";
+            $this->info("Yeni middleware dosyası oluşturuldu: $newMiddlewaresPath");
         } else {
-            echo "Yeni middlewares dosyası oluşturulamadı!\n";
+            $this->error("Yeni middleware dosyası oluşturulamadı!");
         }
-    }
-
-    public static function getDescription(): string
-    {
-        return "Yeni bir middlewares dosyası oluşturur. => make:middleware middlewareAdi";
     }
 }

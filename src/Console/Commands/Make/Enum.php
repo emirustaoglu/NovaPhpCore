@@ -2,24 +2,32 @@
 
 namespace NovaCore\Console\Commands\Make;
 
-class Enum
+use NovaCore\Console\Command;
+
+class Enum extends Command
 {
+    protected string $signature = 'make:enum {enumName}';
+    protected string $description = 'Yeni bir enum dosyası oluşturur.';
+
     public function handle(): void
     {
-        global $argv;
-        $enumName = $argv[2];
+        $enumName = $this->argument('enumName');
+        $type = $this->argument(1);
+
         if (!$enumName) {
-            die("Bir enum adı belirtmelisiniz. Örnek: php nova make:enum enumName\n");
+            $this->error("Bir enum adı belirtmelisiniz. Örnek: php nova make:enum enumName");
+            return;
         }
 
         // Template dosyasının yolu
-        $templatePath = __DIR__ . '/../../Temp/' . 'Enum.php';
+        $templatePath = __DIR__ . '/../../Templates/' . 'Enum.php';
 
         // EnumName'deki son bölümü sınıf adı olarak al
         $enumNameParts = explode('/', $enumName);
         $className = end($enumNameParts);  // Gelen son parçayı alır, örn: Invoice
-        if (isset($argv[3])) {
-            $className .= " :" . $argv[3];
+        
+        if ($type) {
+            $className .= " :" . $type;
         }
 
         // Yeni enum dosyasının oluşturulacağı yol
@@ -32,7 +40,8 @@ class Enum
         }
 
         if (!file_exists($templatePath)) {
-            die("Template dosyası bulunamadı!\n");
+            $this->error("Template dosyası bulunamadı!");
+            return;
         }
 
         // Namespace'i oluştur (App\Enum\Kullanici gibi)
@@ -62,16 +71,11 @@ namespace " . $namespace . ";", // Dinamik namespace ekle
             str_replace('%EklenmeTarihi%', date('Y-m-d H:i:s'), $templateContent)
         );
 
-        // Yeni controller dosyasını oluştur ve içeriğini yaz
+        // Yeni enum dosyasını oluştur ve içeriğini yaz
         if (file_put_contents($newEnumPath, $templateContent) !== false) {
-            echo "Yeni enum dosyası oluşturuldu: $newEnumPath\n";
+            $this->info("Yeni enum dosyası oluşturuldu: $newEnumPath");
         } else {
-            echo "Yeni enum dosyası oluşturulamadı!\n";
+            $this->error("Yeni enum dosyası oluşturulamadı!");
         }
-    }
-
-    public static function getDescription(): string
-    {
-        return "Yeni bir enum dosyası oluşturur. => make:enum enumAdi";
     }
 }

@@ -2,22 +2,30 @@
 
 namespace NovaCore\Logger;
 
-class Logger implements LoggerInterface
-{
-    protected string $logPath;
-    protected array $logLevels;
-    protected string $logFilenamePattern;
-    protected int $maxLogSize;
+use NovaCore\Config\ConfigLoader;
 
-    public function __construct(array $config = [])
+class Logger
+{
+    private string $channel;
+    private string $logPath;
+    private array $logLevels;
+    private string $logFilenamePattern;
+    private int $maxLogSize;
+
+    public function __construct(string $channel = null)
     {
-        // Config dışarıdan gelmeli, varsayılanlar sağlanmalı
-        $this->logPath = rtrim($config['log_directory'] ?? __DIR__ . '/logs', '/') . '/';
+        $this->channel = $channel ?? ConfigLoader::getInstance()->get('logging.default');
+        $config = ConfigLoader::getInstance()->get("logging.channels.{$this->channel}");
+
+        if (empty($config)) {
+            throw new \InvalidArgumentException("Logging channel '{$this->channel}' not configured");
+        }
+
+        $this->logPath = rtrim($config['log_directory'] ?? sys_get_temp_dir() . '/nova_logs', '/') . '/';
         $this->logLevels = $config['log_levels'] ?? ['error', 'warning', 'info', 'debug'];
         $this->logFilenamePattern = $config['log_filename_pattern'] ?? '{level}-{date}.log';
-        $this->maxLogSize = $config['max_log_size'] ?? 5 * 1024 * 1024; // Varsayılan: 5MB
+        $this->maxLogSize = $config['max_log_size'] ?? 5 * 1024 * 1024; // Default: 5MB
 
-        // Log dizini oluştur
         if (!is_dir($this->logPath)) {
             mkdir($this->logPath, 0777, true);
         }
@@ -29,40 +37,68 @@ class Logger implements LoggerInterface
             return;
         }
 
-        $date = date('Y-m-d H:i:s');
-        $logFile = $this->getLogFilename($level);
+        $filename = $this->getLogFilename($level);
+        $logEntry = $this->formatLogEntry($level, $message, $context);
 
-        // Log mesajı oluştur
-        $contextString = !empty($context) ? json_encode($context) : '';
-        $logMessage = "[$date] [$level]: $message $contextString" . PHP_EOL;
-
-        // Dosya boyutunu kontrol et ve yeni dosya oluştur
-        if (file_exists($logFile) && filesize($logFile) >= $this->maxLogSize) {
-            $logFile = $this->getLogFilename($level, true);
+        if (file_exists($filename) && filesize($filename) > $this->maxLogSize) {
+            $this->rotateLogFile($filename);
         }
 
-        file_put_contents($logFile, $logMessage, FILE_APPEND);
+        file_put_contents($filename, $logEntry . PHP_EOL, FILE_APPEND | LOCK_EX);
     }
 
-    protected function getLogFilename(string $level, bool $rotated = false): string
+    private function getLogFilename(string $level): string
     {
-        $timestamp = $rotated ? '-' . date('Ymd-His') : '';
-        return $this->logPath . str_replace(
-                ['{level}', '{date}'],
-                [$level, date('Y-m-d') . $timestamp],
-                $this->logFilenamePattern
-            );
+        $filename = str_replace(
+            ['{level}', '{date}'],
+            [$level, date('Y-m-d')],
+            $this->logFilenamePattern
+        );
+
+        return $this->logPath . $filename;
     }
 
-    // Log seviyelerine göre kolay erişim metotları
-    public function info(string $message, array $context = []): void
+    private function formatLogEntry(string $level, string $message, array $context = []): string
     {
-        $this->log('info', $message, $context);
+        $timestamp = date('Y-m-d H:i:s');
+        $contextStr = empty($context) ? '' : ' ' . json_encode($context);
+        
+        return sprintf(
+            '[%s] %s: %s%s',
+            $timestamp,
+            strtoupper($level),
+            $message,
+            $contextStr
+        );
     }
 
-    public function warning(string $message, array $context = []): void
+    private function rotateLogFile(string $filename): void
     {
-        $this->log('warning', $message, $context);
+        $info = pathinfo($filename);
+        $rotated = sprintf(
+            '%s/%s-%s.%s',
+            $info['dirname'],
+            $info['filename'],
+            date('Y-m-d-His'),
+            $info['extension']
+        );
+        
+        rename($filename, $rotated);
+    }
+
+    public function emergency(string $message, array $context = []): void
+    {
+        $this->log('emergency', $message, $context);
+    }
+
+    public function alert(string $message, array $context = []): void
+    {
+        $this->log('alert', $message, $context);
+    }
+
+    public function critical(string $message, array $context = []): void
+    {
+        $this->log('critical', $message, $context);
     }
 
     public function error(string $message, array $context = []): void
@@ -70,8 +106,23 @@ class Logger implements LoggerInterface
         $this->log('error', $message, $context);
     }
 
-    public function critical(string $message, array $context = []): void
+    public function warning(string $message, array $context = []): void
     {
-        $this->log('critical', $message, $context);
+        $this->log('warning', $message, $context);
+    }
+
+    public function notice(string $message, array $context = []): void
+    {
+        $this->log('notice', $message, $context);
+    }
+
+    public function info(string $message, array $context = []): void
+    {
+        $this->log('info', $message, $context);
+    }
+
+    public function debug(string $message, array $context = []): void
+    {
+        $this->log('debug', $message, $context);
     }
 }

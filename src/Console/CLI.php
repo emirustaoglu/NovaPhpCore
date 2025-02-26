@@ -6,164 +6,184 @@ use DirectoryIterator;
 use RecursiveIteratorIterator;
 use RecursiveDirectoryIterator;
 
-
 class CLI
 {
     protected array $commands = [];
-    private $commandsDirectory;
+    protected array $commandGroups = [];
+    protected string $commandsDirectory;
+    protected string $frameworkPath;
 
     /**
-     * Komutları dizinden otomatik olarak yükler.
+     * CLI sınıfını başlatır
      */
-    public function __construct(string $commandsDirectory = __DIR__ . '/Commands')
+    public function __construct(?string $frameworkPath = null)
     {
-        $this->commandsDirectory = $commandsDirectory;
-        $this->loadCommands($commandsDirectory);
-    }
+        // Framework yolunu belirle
+        $this->frameworkPath = $frameworkPath ?? getcwd();
+        
+        // Önce framework'ün komutlarını yükle
+        $frameworkCommands = $this->frameworkPath . '/app/Console/Commands';
+        if (is_dir($frameworkCommands)) {
+            $this->loadCommands($frameworkCommands);
+        }
 
-    /**
-     * Komutları ilgili dizinden yükler.
-     */
-    private function loadCommands(string $commandsDirectory): void
-    {
-        $iterator = new DirectoryIterator($commandsDirectory);
-
-        foreach ($iterator as $fileinfo) {
-            if ($fileinfo->isFile() && $fileinfo->getExtension() === 'php') {
-                $commandName = $fileinfo->getBasename('.php');
-                $className = "NovaCore\\Console\\Commands\\$commandName";
-                $this->commands[strtolower($commandName)] = $className;
-            }
+        // Sonra core komutlarını yükle
+        $coreCommands = __DIR__ . '/Commands';
+        if (is_dir($coreCommands)) {
+            $this->loadCommands($coreCommands);
         }
     }
 
     /**
-     * Komut satırını çalıştırır ve ilgili komutu uygular.
+     * Komutları ilgili dizinden yükler
      */
-    public function run(): void
+    private function loadCommands(string $directory): void
     {
-        $command = $this->getCommand();
-
-        // -list komutunu kontrol et
-        if ($command === '-list') {
-            $this->listCommands();
-        } elseif (strpos($command, 'make:') === 0) {
-            $this->handleMakeCommand($command);
-        } elseif(strpos($command, 'route:') === 0){
-            $this->handleRouteCommand($command);
-        } else {
-            $this->handleCommand($command);
+        if (!is_dir($directory)) {
+            return;
         }
-    }
-
-    /**
-     * Komutları dinamik olarak listeleyen fonksiyon.
-     */
-    private function listCommands(): void
-    {
-        echo "Kullanılabilir komutlar:\n";
 
         $iterator = new RecursiveIteratorIterator(
-            new RecursiveDirectoryIterator($this->commandsDirectory, RecursiveDirectoryIterator::SKIP_DOTS)
+            new RecursiveDirectoryIterator($directory, RecursiveDirectoryIterator::SKIP_DOTS)
         );
 
         foreach ($iterator as $fileinfo) {
             if ($fileinfo->isFile() && $fileinfo->getExtension() === 'php') {
-                // Komutun adını belirle
-                $relativePath = str_replace($this->commandsDirectory . DIRECTORY_SEPARATOR, '', $fileinfo->getPathname());
-                $commandName = str_replace(['.php', DIRECTORY_SEPARATOR], ['', ':'], $relativePath);
+                $relativePath = str_replace($directory . DIRECTORY_SEPARATOR, '', $fileinfo->getPathname());
+                $namespace = str_replace(['.php', DIRECTORY_SEPARATOR], ['', '\\'], $relativePath);
+                
+                // Framework komutları için App namespace'i
+                if (strpos($directory, 'app/Console/Commands') !== false) {
+                    $className = "App\\Console\\Commands\\" . $namespace;
+                } 
+                // Core komutları için NovaCore namespace'i
+                else {
+                    $className = "NovaCore\\Console\\Commands\\" . $namespace;
+                }
 
-                // Sınıf adını oluştur
-                $className = "NovaCore\\Console\\Commands\\" . str_replace(DIRECTORY_SEPARATOR, '\\', $relativePath);
-                $className = str_replace('.php', '', $className);
-
-                // Eğer sınıf tanımlıysa ve getDescription metodu varsa, açıklamayı al
-                if (class_exists($className) && method_exists($className, 'getDescription')) {
-                    $description = $className::getDescription();
-                    echo " - $commandName => $description\n";
+                if (class_exists($className)) {
+                    $command = new $className();
+                    $this->addCommand($command);
                 }
             }
         }
     }
 
-    private function handleCommand(string $command): void
+    /**
+     * Komutu ekler ve gruplara ayırır
+     */
+    private function addCommand($command): void
     {
-        // Komut sınıfını kontrol et
-        $commandClass = "NovaCore\\Console\\Commands\\$command";
+        $signature = $command->getSignature();
+        $this->commands[$signature] = $command;
 
-        if (class_exists($commandClass)) {
-            $this->executeCommand($commandClass);
-        } else {
-            echo "Geçersiz komut: $command\n";
-        }
-    }
-
-    private function handleRouteCommand(string $command): void
-    {
-        // 'route:' komutlarını ayır
-        $parts = explode(':', $command);
-
-        if (count($parts) < 2) {
-            echo "Geçersiz komut formatı. Geçerli komut listesi php nova list komutunu kullanınız.";
-            exit(1);
-        }
-
-        $action = $parts[1]; // 'migration', 'seed', 'view' gibi
-        $className = ucfirst($action); // Migration -> MigrationCommand
-
-        // Komut sınıfını kontrol et
-        $commandClass = "NovaCore\\Console\\Commands\\Route\\$className";
-
-        if (class_exists($commandClass)) {
-            $this->executeCommand($commandClass);
-        } else {
-            echo "Geçersiz 'route' komutu: $command\n";
-            exit(1);
+        // Grup bazlı organizasyon
+        $parts = explode(':', $signature);
+        if (count($parts) > 1) {
+            $group = $parts[0];
+            if (!isset($this->commandGroups[$group])) {
+                $this->commandGroups[$group] = [];
+            }
+            $this->commandGroups[$group][] = $signature;
         }
     }
 
     /**
-     * make:xxx komutlarını işle
+     * Komut satırını çalıştırır
      */
-    private function handleMakeCommand(string $command): void
+    public function run(): void
     {
-        // 'make:' komutlarını ayır
-        $parts = explode(':', $command);
+        $command = $_SERVER['argv'][1] ?? '-list';
+        $args = array_slice($_SERVER['argv'], 2);
 
-        if (count($parts) < 2) {
-            echo "Geçersiz komut formatı. Geçerli komut listesi php nova list komutunu kullanınız.";
-            exit(1);
+        if ($command === '-list') {
+            $this->listCommands();
+            return;
         }
 
-        $action = $parts[1]; // 'migration', 'seed', 'view' gibi
-        $className = ucfirst($action); // Migration -> MigrationCommand
+        // make: ve route: komutları için özel kontrol
+        if (strpos($command, 'make:') === 0 || strpos($command, 'route:') === 0) {
+            $parts = explode(':', $command);
+            $type = $parts[0];
+            $action = $parts[1] ?? '';
+            
+            if (empty($action)) {
+                $this->error("Geçersiz komut formatı");
+                return;
+            }
 
-        // Komut sınıfını kontrol et
-        $commandClass = "NovaCore\\Console\\Commands\\Make\\$className";
+            $className = ucfirst($action);
+            $namespace = $type === 'make' ? 'Make' : 'Route';
+            $commandClass = "NovaCore\\Console\\Commands\\{$namespace}\\{$className}";
 
-        if (class_exists($commandClass)) {
-            $this->executeCommand($commandClass);
+            if (class_exists($commandClass)) {
+                $instance = new $commandClass();
+                $instance->execute($args);
+                return;
+            }
+        }
+
+        // Diğer komutlar için normal akış
+        if (isset($this->commands[$command])) {
+            $this->commands[$command]->execute($args);
         } else {
-            echo "Geçersiz 'make' komutu: $command\n";
-            exit(1);
+            $this->error("Geçersiz komut: $command");
+            $this->info("Kullanılabilir komutları görmek için -list kullanın");
         }
     }
 
     /**
-     * Komut satırındaki komut parametresini alır.
+     * Komutları gruplar halinde listeler
      */
-    private function getCommand(): string
+    private function listCommands(): void
     {
-        global $argv;
-        return isset($argv[1]) ? strtolower($argv[1]) : '';
+        echo "\033[1mKullanılabilir Komutlar:\033[0m\n\n";
+
+        // Önce gruplanmış komutları göster
+        foreach ($this->commandGroups as $group => $commands) {
+            echo "\033[33m" . ucfirst($group) . " Komutları:\033[0m\n";
+            foreach ($commands as $command) {
+                $this->printCommand($command);
+            }
+            echo "\n";
+        }
+
+        // Gruplanmamış komutları göster
+        $ungrouped = array_diff(
+            array_keys($this->commands),
+            array_merge(...array_values($this->commandGroups))
+        );
+
+        if (!empty($ungrouped)) {
+            echo "\033[33mDiğer Komutlar:\033[0m\n";
+            foreach ($ungrouped as $command) {
+                $this->printCommand($command);
+            }
+        }
     }
 
     /**
-     * Komutu çalıştırır.
+     * Komut bilgilerini formatlar ve yazdırır
      */
-    private function executeCommand(string $commandClass): void
+    private function printCommand(string $command): void
     {
-        $command = new $commandClass();
-        $command->handle();
+        $description = $this->commands[$command]->getDescription();
+        printf("  \033[32m%-30s\033[0m %s\n", $command, $description);
+    }
+
+    /**
+     * Hata mesajı yazdırır
+     */
+    private function error(string $message): void
+    {
+        echo "\033[31m" . $message . "\033[0m\n";
+    }
+
+    /**
+     * Bilgi mesajı yazdırır
+     */
+    private function info(string $message): void
+    {
+        echo "\033[32m" . $message . "\033[0m\n";
     }
 }

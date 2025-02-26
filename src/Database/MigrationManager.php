@@ -4,36 +4,179 @@ namespace NovaCore\Database;
 
 class MigrationManager
 {
-    private $migrationPath;
-    private $migration;
+    private string $migrationPath;
+    private Database $db;
+    private string $table;
+    private array $migrations = [];
 
-    public function __construct($migrationPath, $settings)
+    public function __construct(string $migrationPath, string $table = 'migrations')
     {
         $this->migrationPath = $migrationPath;
-        if (!file_exists($this->migrationPath)) {
-            die('Belirtilen migration dosya yolu bulunamadı.');
-        }
-        $this->migration = new Migration($settings['tableName'],$settings['host'], $settings['dbname'], $settings['username'], $settings['password']);
+        $this->table = $table;
+        $this->db = Database::getInstance();
+        $this->createMigrationsTable();
     }
 
-    public function runMigrations($direction = 'up')
+    public function migrate(int $steps = 0): void
     {
-        $files = scandir($this->migrationPath);
-        if(count($files) < 3){ die('İşlem yapılacak migration dosyası bulunamadı.');}
+        $this->loadMigrations();
+        $pendingMigrations = $this->getPendingMigrations();
+
+        if ($steps > 0) {
+            $pendingMigrations = array_slice($pendingMigrations, 0, $steps);
+        }
+
+        $batch = $this->getNextBatchNumber();
+
+        foreach ($pendingMigrations as $migration) {
+            $this->runUp($migration, $batch);
+        }
+    }
+
+    public function rollback(int $steps = 1): void
+    {
+        $migrations = $this->getLastBatchMigrations($steps);
+
+        foreach ($migrations as $migration) {
+            $this->runDown($migration);
+        }
+    }
+
+    public function reset(): void
+    {
+        $migrations = array_reverse($this->getRanMigrations());
+
+        foreach ($migrations as $migration) {
+            $this->runDown($migration);
+        }
+    }
+
+    public function refresh(): void
+    {
+        $this->reset();
+        $this->migrate();
+    }
+
+    public function status(): array
+    {
+        $this->loadMigrations();
+        $ran = $this->getRanMigrations();
+        $status = [];
+
+        foreach ($this->migrations as $name => $path) {
+            $status[] = [
+                'migration' => $name,
+                'batch' => in_array($name, $ran) ? $this->getBatchNumber($name) : null,
+                'status' => in_array($name, $ran) ? 'Ran' : 'Pending'
+            ];
+        }
+
+        return $status;
+    }
+
+    private function loadMigrations(): void
+    {
+        $files = glob($this->migrationPath . '/*.php');
         foreach ($files as $file) {
-            if (pathinfo($file, PATHINFO_EXTENSION) === 'php') {
-                $this->migration->apply($this->migrationPath . DIRECTORY_SEPARATOR . $file, $direction);
-            }
+            $name = pathinfo($file, PATHINFO_FILENAME);
+            $this->migrations[$name] = $file;
         }
     }
 
-    public function migrateUp()
+    private function createMigrationsTable(): void
     {
-        $this->runMigrations('up');
+        if (!Schema::hasTable($this->table)) {
+            Schema::create($this->table, function ($table) {
+                $table->id();
+                $table->string('migration');
+                $table->integer('batch');
+                $table->timestamps();
+            });
+        }
     }
 
-    public function migrateDown()
+    private function getPendingMigrations(): array
     {
-        $this->runMigrations('down');
+        $ran = $this->getRanMigrations();
+        return array_diff(array_keys($this->migrations), $ran);
+    }
+
+    private function getRanMigrations(): array
+    {
+        return $this->db->table($this->table)
+            ->orderBy('batch')
+            ->orderBy('migration')
+            ->pluck('migration')
+            ->toArray();
+    }
+
+    private function getNextBatchNumber(): int
+    {
+        $lastBatch = $this->db->table($this->table)
+            ->max('batch');
+
+        return $lastBatch + 1;
+    }
+
+    private function getBatchNumber(string $migration): int
+    {
+        $result = $this->db->table($this->table)
+            ->where('migration', $migration)
+            ->value('batch');
+
+        return (int) $result;
+    }
+
+    private function getLastBatchMigrations(int $steps): array
+    {
+        $query = $this->db->table($this->table)
+            ->orderBy('batch', 'desc')
+            ->orderBy('migration', 'desc');
+
+        if ($steps > 0) {
+            $query->limit($steps);
+        }
+
+        return $query->pluck('migration')->toArray();
+    }
+
+    private function runUp(string $name, int $batch): void
+    {
+        $file = $this->migrations[$name];
+        $migration = $this->resolve($file);
+
+        $this->db->transaction(function () use ($migration, $name, $batch) {
+            $migration->up();
+
+            $this->db->table($this->table)->insert([
+                'migration' => $name,
+                'batch' => $batch
+            ]);
+
+            echo "Migrated: $name\n";
+        });
+    }
+
+    private function runDown(string $name): void
+    {
+        $file = $this->migrations[$name];
+        $migration = $this->resolve($file);
+
+        $this->db->transaction(function () use ($migration, $name) {
+            $migration->down();
+
+            $this->db->table($this->table)
+                ->where('migration', $name)
+                ->delete();
+
+            echo "Rolled back: $name\n";
+        });
+    }
+
+    private function resolve(string $file): Migration
+    {
+        require_once $file;
+        $class = pathinfo($file, PATHINFO_FILENAME);
+        return new $class;
     }
 }

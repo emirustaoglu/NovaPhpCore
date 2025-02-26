@@ -2,94 +2,141 @@
 
 namespace NovaCore\Database;
 
+use NovaCore\Config\ConfigLoader;
+use PDO;
+use PDOException;
+
 class Database
 {
-    private $connection;
+    private static ?Database $instance = null;
+    private ?PDO $dbConnection = null;
+    private string $connectionName;
+    private array $queryLog = [];
+    private bool $logging = false;
 
-    public $data;
-    private $dbHost;
-    private $dbName;
-    private $dbUser;
-    private $dbPass;
-    private $dbCharset;
-    private $maintanceMode;
-
-    public function __construct(array $config)
+    private function __construct(string $connectionName = null)
     {
-        $this->dbHost = $config['host'];
-        $this->dbName = $config['name'];
-        $this->dbUser = $config['user'];
-        $this->dbPass = $config['pass'];
-        $this->dbCharset = $config['charset'];
-        $this->maintanceMode = $config['maintanceMode'];
+        $this->connectionName = $connectionName ?? ConfigLoader::getInstance()->get('database.default');
     }
 
-    private function connect()
+    public static function getInstance(string $connectionName = null): self
     {
-        if ($this->connection === null) {
-            $dsn = "mysql:host=" . $this->dbHost . ";dbname=" . $this->dbName . ";charset=" . $this->dbCharset;
-            $this->connection = new PDO($dsn, $this->dbUser, $this->dbPass, [
-                PDO::ATTR_ERRMODE => PDO::ERRMODE_EXCEPTION,
-                PDO::ATTR_DEFAULT_FETCH_MODE => PDO::FETCH_ASSOC,
-                PDO::ATTR_EMULATE_PREPARES => false,
-            ]);
+        if (self::$instance === null) {
+            self::$instance = new self($connectionName);
         }
-        return $this->connection;
+        return self::$instance;
     }
 
-    private function query($query, array $params = null)
+    public function connect(): PDO
     {
+        if ($this->dbConnection !== null) {
+            return $this->dbConnection;
+        }
+
+        $config = ConfigLoader::getInstance()->get("database.connections.{$this->connectionName}");
+        
+        if (empty($config)) {
+            throw new \InvalidArgumentException("Database connection '{$this->connectionName}' not configured");
+        }
+
+        if ($config['maintanceMode'] ?? false) {
+            throw new \RuntimeException("Database is in maintenance mode");
+        }
+
         try {
-            $db = $this->connect();
-            $stmt = $db->prepare($query);
-            if ($params !== null) {
-                $stmt->execute($params);
-            } else {
-                $stmt->execute();
-            }
-            return $stmt;
-        } catch (Exception $ex) {
-            if ($this->maintenanceMode()) {
-                print "=_" . $ex->getMessage();
-                exit;
-            } else {
-                return 0;
-            }
+            $dsn = sprintf(
+                "%s:host=%s;port=%d;dbname=%s;charset=%s",
+                $config['driver'],
+                $config['host'],
+                $config['port'],
+                $config['database'],
+                $config['charset']
+            );
+
+            $this->dbConnection = new PDO(
+                $dsn,
+                $config['username'],
+                $config['password'],
+                [
+                    PDO::ATTR_ERRMODE => PDO::ERRMODE_EXCEPTION,
+                    PDO::ATTR_DEFAULT_FETCH_MODE => PDO::FETCH_ASSOC,
+                    PDO::ATTR_EMULATE_PREPARES => false,
+                ]
+            );
+
+            return $this->dbConnection;
+        } catch (PDOException $e) {
+            throw new \RuntimeException("Could not connect to database: " . $e->getMessage());
         }
     }
 
-    public function getAll($query, array $params = null, $getRow = 1)
+    public function getConnection(): PDO
     {
-        $stmt = $this->query($query, $params);
-        if ($getRow == 1) {
-            return ["count" => $stmt->rowCount(), "data" => $stmt->fetchAll(PDO::FETCH_ASSOC)];
+        return $this->connect();
+    }
+
+    public function table(string $table): QueryBuilder
+    {
+        return new QueryBuilder($this->connect(), $table);
+    }
+
+    public function raw(string $query, array $params = []): RawQuery
+    {
+        return new RawQuery($this->connect(), $query, $params);
+    }
+
+    public function beginTransaction(): bool
+    {
+        return $this->connect()->beginTransaction();
+    }
+
+    public function commit(): bool
+    {
+        return $this->connect()->commit();
+    }
+
+    public function rollBack(): bool
+    {
+        return $this->connect()->rollBack();
+    }
+
+    public function transaction(callable $callback)
+    {
+        $this->beginTransaction();
+
+        try {
+            $result = $callback($this);
+            $this->commit();
+            return $result;
+        } catch (\Exception $e) {
+            $this->rollBack();
+            throw $e;
         }
-        return $stmt->fetchAll();
     }
 
-    public function getRow($query, array $params = null, $getRow = 1)
+    public function enableQueryLog(): void
     {
-        $stmt = $this->query($query, $params);
-        if ($getRow == 1) {
-            return ["count" => $stmt->rowCount(), "data" => $stmt->fetch(PDO::FETCH_ASSOC)];
+        $this->logging = true;
+    }
+
+    public function disableQueryLog(): void
+    {
+        $this->logging = false;
+    }
+
+    public function getQueryLog(): array
+    {
+        return $this->queryLog;
+    }
+
+    public function logQuery(string $query, array $bindings = [], float $time = null): void
+    {
+        if ($this->logging) {
+            $this->queryLog[] = [
+                'query' => $query,
+                'bindings' => $bindings,
+                'time' => $time
+            ];
         }
-        return $stmt->fetch(PDO::FETCH_ASSOC);
-    }
-
-    public function getJson($query, array $params = null)
-    {
-        $stmt = $this->query($query, $params);
-        return json_encode($stmt->fetchAll(), JSON_UNESCAPED_UNICODE | JSON_PRETTY_PRINT);
-    }
-
-    public function insertUpdate($query, array $params = null)
-    {
-        $stmt = $this->query($query, $params);
-        return $stmt->rowCount();
-    }
-
-    private function maintenanceMode()
-    {
-        return $this->maintanceMode;
     }
 }

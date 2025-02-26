@@ -2,13 +2,22 @@
 
 namespace NovaCore\Console\Commands\Make;
 
-class View
+use NovaCore\Console\Command;
+
+class View extends Command
 {
+    protected string $signature = 'make:view {viewName}';
+    protected string $description = 'Yeni bir view dosyası oluşturur.';
+
     public function handle(): void
     {
-        global $argv;
-        $fileOption = explode("/", $argv[2]);
+        $viewPath = $this->argument('viewName');
+        if (!$viewPath) {
+            $this->error("Bir View adı belirtmelisiniz. Örnek: php nova make:view viewName");
+            return;
+        }
 
+        $fileOption = explode("/", $viewPath);
         $fileOption = array_filter($fileOption, fn($v) => !empty($v));
 
         $folderName = "";
@@ -19,10 +28,6 @@ class View
             $fileName = "/" . end($fileOption);
         } else {
             $fileName = $fileOption[0];
-        }
-
-        if (empty($fileName)) {
-            die("Bir View adı belirtmelisiniz. Örnek: php nova make:view viewName\n");
         }
 
         $newViewPath = BasePath . "resources/views/" . $folderName; // Dizin yolunu alıyoruz
@@ -36,14 +41,9 @@ class View
         $viewData = "{{-- Dosya Adı: %DosyaAdi% --}}\n{{-- Eklenme Tarihi: %EklenmeTarihi% --}}";
 
         if (file_put_contents($newViewFile, str_replace('%DosyaAdi%', $fileName, str_replace('%EklenmeTarihi%', date('Y-m-d H:i:s'), $viewData))) !== false) {
-            echo "Yeni view dosyası oluşturuldu: $newViewFile\n";
+            $this->info("Yeni view dosyası oluşturuldu: $newViewFile");
         } else {
-            echo "Yeni view dosyası oluşturulamadı!\n";
+            $this->error("Yeni view dosyası oluşturulamadı!");
         }
-    }
-
-    public static function getDescription(): string
-    {
-        return "Yeni bir view dosyası oluşturur. => make:view viewAdi";
     }
 }

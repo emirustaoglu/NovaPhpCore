@@ -2,18 +2,23 @@
 
 namespace NovaCore\Console\Commands\Make;
 
-class Controller
+use NovaCore\Console\Command;
+
+class Controller extends Command
 {
+    protected string $signature = 'make:controller {controllerName}';
+    protected string $description = 'Yeni bir controller dosyası oluşturur.';
+
     public function handle(): void
     {
-        global $argv;
-        $controllerName = $argv[2];
+        $controllerName = $this->argument('controllerName');
         if (!$controllerName) {
-            die("Bir controller adı belirtmelisiniz. Örnek: php nova make:controller controllerName\n");
+            $this->error("Bir controller adı belirtmelisiniz. Örnek: php nova make:controller controllerName");
+            return;
         }
 
         // Template dosyasının yolu
-        $templatePath = __DIR__ . '/../../Temp/' . 'Controller.php';
+        $templatePath = __DIR__ . '/../../Templates/' . 'Controller.php';
 
         // ControllerName'deki son bölümü sınıf adı olarak al
         $controllerNameParts = explode('/', $controllerName);
@@ -29,7 +34,8 @@ class Controller
         }
 
         if (!file_exists($templatePath)) {
-            die("Template dosyası bulunamadı!\n");
+            $this->error("Template dosyası bulunamadı!");
+            return;
         }
 
         // Namespace'i oluştur (App\Controllers\Kullanici gibi)
@@ -66,14 +72,9 @@ namespace " . $namespace . ";", // Dinamik namespace ekle
 
         // Yeni controller dosyasını oluştur ve içeriğini yaz
         if (file_put_contents($newControllerPath, $templateContent) !== false) {
-            echo "Yeni controller dosyası oluşturuldu: $newControllerPath\n";
+            $this->info("Yeni controller dosyası oluşturuldu: $newControllerPath");
         } else {
-            echo "Yeni controller dosyası oluşturulamadı!\n";
+            $this->error("Yeni controller dosyası oluşturulamadı!");
         }
-    }
-
-    public static function getDescription(): string
-    {
-        return "Yeni bir controller dosyası oluşturur. => make:controller controllerAdi";
     }
 }
