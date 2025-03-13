@@ -1,0 +1,41 @@
+{
+  "name": "novaphp/core",
+  "type": "library",
+  "homepage": "https://github.com/emirustaoglu",
+  "description": "NovaPhp",
+  "version": "1.0.0",
+  "license": "MIT",
+  "autoload": {
+    "psr-4": {
+      "NovaPhp\\Core\\": "src/"
+    },
+    "files": [
+      "src/Helper.php"
+    ]
+  },
+  "authors": [
+    {
+      "name": "Yusuf Emir USTAOĞLU",
+      "email": "emiru893@gmail.com",
+      "homepage": "https://github.com/emirustaoglu",
+      "role": "Developer"
+    }
+  ],
+  "minimum-stability": "dev",
+  "require": {
+    "php": ">=8.3.0",
+    "ext-pdo": "*",
+    "novaphp/config": "^1.0.0",
+    "novaphp/database": "^1.0.0",
+    "izniburak/router": "^3.0",
+    "jenssegers/blade": "^2.0",
+    "illuminate/view": "11.7.0",
+    "vlucas/valitron": "^1.4",
+    "filp/whoops": "^2.15",
+    "arrilot/dotenv-php": "^2.0",
+    "illuminate/database": "11.x-dev",
+    "doctrine/dbal": "4.3.x-dev",
+    "symfony/mailer": "7.3.x-dev",
+    "symfony/http-client": "7.3.x-dev"
+  }
+}
