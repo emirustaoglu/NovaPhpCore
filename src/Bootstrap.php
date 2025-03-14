@@ -16,7 +16,7 @@ class Bootstrap
     public $view;
     public $validator;
 
-    public function __construct($basePath)
+    public function __construct($basePath = "")
     {
         $this->basePath = $basePath;
 
