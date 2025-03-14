@@ -17,7 +17,7 @@ class View
 
     public function show($view, $data = [])
     {
-        $blade = new Blade(config('app.paths.view'), config('app.paths.views_cache'));
+        $blade = new Blade(config('app.paths.views'), config('app.paths.views_cache'));
         $blade->share('errors', $this->validator->errors());
         if (config('app.debug')) {
             $bladeCache = glob(config('app.paths.views_cache') . '*');
