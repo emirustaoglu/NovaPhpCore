@@ -74,3 +74,10 @@ if (!function_exists('novaVersion')) {
         return $composer['version'];
     }
 }
+
+if (!function_exists('getEnv')) {
+    function getEnv(string $key, $default = null)
+    {
+        return \Arrilot\DotEnv\DotEnv::get($key, $default);
+    }
+}
