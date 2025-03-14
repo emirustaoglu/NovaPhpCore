@@ -3,7 +3,7 @@
   "type": "library",
   "homepage": "https://github.com/emirustaoglu",
   "description": "NovaPhp",
-  "version": "1.0.0",
+  "version": "0.0.1",
   "license": "MIT",
   "autoload": {
     "psr-4": {
@@ -21,7 +21,7 @@
       "role": "Developer"
     }
   ],
-  "minimum-stability": "dev",
+  "minimum-stability": "stable",
   "require": {
     "php": ">=8.3.0",
     "ext-pdo": "*",
@@ -33,9 +33,9 @@
     "vlucas/valitron": "^1.4",
     "filp/whoops": "^2.15",
     "arrilot/dotenv-php": "^2.0",
-    "illuminate/database": "11.x-dev",
-    "doctrine/dbal": "4.3.x-dev",
-    "symfony/mailer": "7.3.x-dev",
-    "symfony/http-client": "7.3.x-dev"
+    "illuminate/database": "^11.44",
+    "doctrine/dbal": "^4.2",
+    "symfony/mailer": "^7.2",
+    "symfony/http-client": "^7.2"
   }
 }

@@ -2,3 +2,4 @@ vendor
 .idea
 public/index.php
 nova
+composer.lock
