@@ -75,8 +75,8 @@ if (!function_exists('novaVersion')) {
     }
 }
 
-if (!function_exists('getEnv')) {
-    function getEnv(string $key, $default = null)
+if (!function_exists('getConfig')) {
+    function getConfig(string $key, $default = null)
     {
         return \Arrilot\DotEnv\DotEnv::get($key, $default);
     }
